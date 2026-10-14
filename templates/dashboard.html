@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control - StockFlow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+
+    <nav class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shadow-md">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl font-bold tracking-wide">StockFlow</span>
+            <span class="bg-blue-600 text-xs px-2 py-1 rounded font-medium">Enterprise v3.0</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-sm text-slate-300">{{ current_user.email }}</span>
+            <a href="{{ url_for('logout') }}" 
+               class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-md font-medium transition duration-200">
+               Cerrar Sesión
+            </a>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto p-6 space-y-6">
+
+        {% if alertas %}
+        <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg shadow-sm">
+            <div class="flex items-center">
+                <span class="text-xl mr-2">⚠️</span>
+                <div>
+                    <h3 class="font-bold text-amber-800 text-sm">Alerta de Inventario Crítico</h3>
+                    <p class="text-xs text-amber-700 mt-0.5">
+                        Hay {{ alertas|length }} producto(s) por debajo o igual al stock mínimo establecido.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Estadísticas y Gráfico -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="space-y-4 lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center">
+                    
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Valor Total Inventario</p>
+                        <p class="text-2xl font-bold text-slate-800 mt-1">{{ "%.2f"|format(total_valor) }} €</p>
+                    
+                    
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Unidades Totales</p>
+                    <p class="text-2xl font-bold text-slate-800 mt-1">{{ total_items }} uds.</p>
+                </div>
+            </div>
+
+            <!-- Gráfico de Valor por Categoría -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center items-center">
+                <h3 class="text-xs font-bold text-slate-600 uppercase mb-2">Valoración por Categoría</h3>
+                <div class="w-full h-32 flex justify-center">
+                    <canvas id="categoriaChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Formulario Nuevo Producto -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-fit">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">
+                    ➕ Registrar Producto
+                </h2>
+                <form action="{{ url_for('agregar_producto') }}" method="POST" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">SKU / Código</label>
+                        <input type="text" name="sku" required placeholder="PROD-001"
+                               class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre del Producto</label>
+                        <input type="text" name="nombre" required placeholder="Monitor 27'' 4K"
+                               class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
+                        <input type="text" name="categoria" required placeholder="Electrónica"
+                               class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Stock Inicial</label>
+                            <input type="number" name="stock" required min="0" placeholder="10"
+                                   class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Stock Mínimo</label>
+                            <input type="number" name="stock_minimo" required min="1" placeholder="3"
+                                   class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Precio Unitario (€)</label>
+                        <input type="number" step="0.01" name="precio" required placeholder="299.99"
+                               class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                    <button type="submit" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg text-sm transition duration-200 shadow-sm">
+                        Guardar en Inventario
+                    </button>
+                </form>
+            </div>
+
+            <!-- Tabla y Paginación -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-center mb-4 pb-2 border-b border-slate-100 gap-3">
+                        <h2 class="text-lg font-bold text-slate-800">📦 Inventario y Movimientos</h2>
+                        <div class="flex items-center space-x-2 w-full sm:w-auto">
+                            <input type="text" id="buscador" placeholder="Filtrar producto..." 
+                                   class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-48">
+                            <a href="{{ url_for('exportar_csv') }}" 
+                               class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition whitespace-nowrap">
+                               📥 Exportar CSV
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm" id="tabla-productos">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 uppercase text-xs border-b border-slate-200">
+                                    <th class="py-3 px-3">SKU</th>
+                                    <th class="py-3 px-3">Producto</th>
+                                    <th class="py-3 px-3 text-center">Stock</th>
+                                    <th class="py-3 px-3">Precio</th>
+                                    <th class="py-3 px-3 text-center">Ajuste Rápido</th>
+                                    <th class="py-3 px-3 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for p in productos %}
+                                <tr class="hover:bg-slate-50 transition fila-producto">
+                                    <td class="py-3 px-3 font-mono text-xs text-slate-600">{{ p.sku }}</td>
+                                    <td class="py-3 px-3">
+                                        <p class="font-semibold text-slate-800">{{ p.nombre }}</p>
+                                        <p class="text-xs text-slate-400">{{ p.categoria }}</p>
+                                    </td>
+                                    <td class="py-3 px-3 text-center">
+                                        {% if p.stock <= p.stock_minimo %}
+                                            <span class="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                                                {{ p.stock }} (Bajo)
+                                            </span>
+                                        {% else %}
+                                            <span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                                                {{ p.stock }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 px-3 font-medium text-slate-700">{{ "%.2f"|format(p.precio) }} €</td>
+                                    
+                                    <td class="py-3 px-3 text-center">
+                                        <form action="{{ url_for('registrar_movimiento', id=p.id) }}" method="POST" class="flex items-center justify-center space-x-1">
+                                            <input type="number" name="cantidad" value="1" min="1" max="999" 
+                                                   class="w-12 text-center text-xs border border-slate-300 rounded py-1">
+                                            <select name="tipo" class="text-xs border border-slate-300 rounded py-1 bg-white">
+                                                <option value="Entrada">➕</option>
+                                                <option value="Salida">➖</option>
+                                            </select>
+                                            <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white px-2 py-1 rounded text-xs">Ok</button>
+                                        </form>
+                                    </td>
+
+                                    <td class="py-3 px-3 text-center space-x-1">
+                                        <a href="{{ url_for('generar_factura', id=p.id) }}" 
+                                           title="Descargar Factura PDF"
+                                           class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2.5 py-1 rounded text-xs font-semibold transition">
+                                           📄 PDF
+                                        </a>
+                                        <a href="{{ url_for('eliminar_producto', id=p.id) }}" 
+                                           onclick="return confirm('¿Seguro que deseas borrar este producto?');"
+                                           class="text-red-500 hover:text-red-700 text-xs font-semibold">
+                                           Borrar
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-slate-400 text-sm">
+                                        No hay productos registrados en el sistema.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Controles de Paginación -->
+                    {% if pagination.pages > 1 %}
+                    <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-100 text-xs">
+                        <span class="text-slate-500">Página {{ pagination.page }} de {{ pagination.pages }}</span>
+                        <div class="space-x-1">
+                            {% if pagination.has_prev %}
+                                <a href="{{ url_for('dashboard', page=pagination.prev_num) }}" class="px-3 py-1 bg-slate-100 rounded hover:bg-slate-200">Anterior</a>
+                            {% endif %}
+                            {% if pagination.has_next %}
+                                <a href="{{ url_for('dashboard', page=pagination.next_num) }}" class="px-3 py-1 bg-slate-100 rounded hover:bg-slate-200">Siguiente</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Historial Reciente de Movimientos -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">📋 Últimos Movimientos de Stock</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead>
+                                <tr class="text-slate-400 uppercase border-b border-slate-100">
+                                    <th class="py-2">Fecha</th>
+                                    <th class="py-2">Producto</th>
+                                    <th class="py-2">Operación</th>
+                                    <th class="py-2 text-right">Cantidad</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                {% for m in movimientos %}
+                                <tr>
+                                    <td class="py-2 text-slate-500">{{ m.fecha }}</td>
+                                    <td class="py-2 font-semibold text-slate-700">{{ m.producto.nombre }}</td>
+                                    <td class="py-2">
+                                        {% if 'Entrada' in m.tipo %}
+                                            <span class="text-emerald-600 font-bold">Entrada Stock</span>
+                                        {% else %}
+                                            <span class="text-red-600 font-bold">Salida / Venta</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-2 text-right font-mono font-bold">{{ m.cantidad }} uds.</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="py-4 text-center text-slate-400">Sin movimientos registrados todavía.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Script Chart.js y Buscador -->
+    <script>
+        document.getElementById('buscador').addEventListener('keyup', function() {
+            const filtro = this.value.toLowerCase();
+            const filas = document.querySelectorAll('.fila-producto');
+            filas.forEach(fila => {
+                const textoFila = fila.textContent.toLowerCase();
+                fila.style.display = textoFila.includes(filtro) ? '' : 'none';
+            });
+        });
+
+        // Configuración del Gráfico de Categorías
+        const labelsData = JSON.parse('{{ cat_labels | tojson | safe }}');
+        const valuesData = JSON.parse('{{ cat_data | tojson | safe }}');
+
+        const ctx = document.getElementById('categoriaChart').getContext('2d');
+        const categoriaChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labelsData,
+                datasets: [{
+                    data: valuesData,
+                    backgroundColor: ['#3b82f6', '#10b981', '#6366f1', '#f59e0b', '#ef4444'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { boxWidth: 10, font: { size: 10 } }
+                    }
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>
